@@ -87,14 +87,14 @@ function priceFor(
   carrierCheap: number,
   stops: number,
 ): { base: number; taxes: number; baggageFee: number; baggageIncluded: boolean } {
-  const perMin = 0.32 + rng() * 0.12;
+  const perMin = 0.55 + rng() * 0.30;
   let base = airMin * perMin * carrierCheap * CABIN_MULT[query.cabin];
-  base *= 1 - stops * 0.12; // connections trade time for money
+  base *= 1 - stops * 0.10; // connections trade time for money
   base *= query.passengers;
-  base = Math.max(28 * query.passengers, base);
-  const taxes = base * (0.14 + rng() * 0.08);
+  base = Math.max(90 * query.passengers, base);
+  const taxes = base * (0.18 + rng() * 0.10);
   const baggageIncluded = rng() > 0.45;
-  const baggageFee = baggageIncluded ? 0 : (18 + Math.floor(rng() * 45)) * query.passengers;
+  const baggageFee = baggageIncluded ? 0 : (30 + Math.floor(rng() * 55)) * query.passengers;
   return {
     base: Math.round(base),
     taxes: Math.round(taxes),

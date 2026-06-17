@@ -30,8 +30,11 @@ function parseQuery(body: unknown): SearchQuery | { error: string } {
   const flexDays = Math.min(7, Math.max(0, Math.floor(Number(b.flexDays) || 0)));
   const maxStops = b.maxStops != null ? Math.max(0, Math.floor(Number(b.maxStops))) : undefined;
   const includeNearby = Boolean(b.includeNearby);
+  const tripDays = b.tripDays != null
+    ? Math.min(21, Math.max(2, Math.floor(Number(b.tripDays))))
+    : undefined;
 
-  return { origin, destination, departDate, returnDate, passengers, cabin, flexDays, maxStops, includeNearby };
+  return { origin, destination, departDate, returnDate, passengers, cabin, flexDays, maxStops, includeNearby, tripDays };
 }
 
 export async function POST(req: NextRequest) {

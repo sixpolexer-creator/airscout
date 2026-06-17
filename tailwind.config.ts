@@ -15,10 +15,23 @@ const config: Config = {
         accent2: "#a78bfa",
         good: "#34d399",
       },
+      boxShadow: {
+        "glow-accent": "0 0 20px rgba(56,189,248,0.15)",
+        "glow-good": "0 0 20px rgba(52,211,153,0.15)",
+        "card-hover": "0 8px 24px rgba(56,189,248,0.06)",
+      },
       keyframes: {
         "deal-in": {
           "0%": { opacity: "0", transform: "translateY(8px) scale(0.98)" },
           "100%": { opacity: "1", transform: "translateY(0) scale(1)" },
+        },
+        "fade-up": {
+          "0%": { opacity: "0", transform: "translateY(12px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        float: {
+          "0%, 100%": { transform: "translateY(0px)" },
+          "50%": { transform: "translateY(-5px)" },
         },
         pulseline: {
           "0%, 100%": { opacity: "0.4" },
@@ -39,6 +52,8 @@ const config: Config = {
       },
       animation: {
         "deal-in": "deal-in 0.35s ease-out",
+        "fade-up": "fade-up 0.4s ease-out",
+        float: "float 3s ease-in-out infinite",
         pulseline: "pulseline 1.4s ease-in-out infinite",
         radar: "radar 2.4s linear infinite",
         shimmer: "shimmer 1.6s infinite",
