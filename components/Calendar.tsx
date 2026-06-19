@@ -1,14 +1,17 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useLang } from "@/components/LangProvider";
+import { translations } from "@/lib/i18n";
 
 interface CalendarProps {
-  depart?: string;             // ISO date
-  ret?: string;                // ISO date
+  depart?: string;
+  ret?: string;
   onChange: (depart?: string, ret?: string) => void;
 }
 
-const WEEKDAYS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
+const WEEKDAYS_EN = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
+const WEEKDAYS_HE = ["ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳", "א׳"];
 
 function iso(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -20,11 +23,14 @@ function daysInMonth(year: number, month: number): number {
   return new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
 }
 
-// Custom, dependency-free range calendar with separate depart/return dates.
 export default function Calendar({ depart, ret, onChange }: CalendarProps) {
+  const { lang } = useLang();
+  const t = translations[lang];
+  const weekdays = lang === "he" ? WEEKDAYS_HE : WEEKDAYS_EN;
+
   const today = useMemo(() => {
-    const t = new Date();
-    return new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()));
+    const d = new Date();
+    return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
   }, []);
   const [cursor, setCursor] = useState<Date>(
     depart ? new Date(`${depart}T00:00:00Z`) : today,
@@ -32,7 +38,12 @@ export default function Calendar({ depart, ret, onChange }: CalendarProps) {
 
   const year = cursor.getUTCFullYear();
   const month = cursor.getUTCMonth();
-  const monthLabel = cursor.toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+  const monthLabel = cursor.toLocaleDateString(lang === "he" ? "he-IL" : "en-US", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+  const todayIso = iso(today);
 
   // Monday-first leading blank count.
   const firstDow = (startOfMonth(year, month).getUTCDay() + 6) % 7;
@@ -43,7 +54,6 @@ export default function Calendar({ depart, ret, onChange }: CalendarProps) {
   for (let d = 1; d <= total; d++) cells.push(iso(new Date(Date.UTC(year, month, d))));
 
   const handlePick = (date: string) => {
-    // First click sets depart; second sets return; third restarts.
     if (!depart || (depart && ret)) {
       onChange(date, undefined);
     } else if (date < depart) {
@@ -53,17 +63,17 @@ export default function Calendar({ depart, ret, onChange }: CalendarProps) {
     }
   };
 
-  const inRange = (date: string) =>
-    depart && ret && date > depart && date < ret;
+  const inRange = (date: string) => depart && ret && date > depart && date < ret;
 
   return (
     <div className="select-none">
-      <div className="flex items-center justify-between mb-3">
+      {/* Month navigation */}
+      <div className="mb-3 flex items-center justify-between">
         <button
           type="button"
           onClick={() => setCursor(new Date(Date.UTC(year, month - 1, 1)))}
           disabled={year === today.getUTCFullYear() && month === today.getUTCMonth()}
-          className="h-8 w-8 rounded-lg border border-edge text-slate-300 hover:bg-edge transition disabled:opacity-30 disabled:cursor-not-allowed"
+          className="flex h-7 w-7 items-center justify-center rounded-lg border border-edge text-slate-400 transition-all hover:border-accent/40 hover:bg-edge hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
           aria-label="Previous month"
         >
           ‹
@@ -72,25 +82,28 @@ export default function Calendar({ depart, ret, onChange }: CalendarProps) {
         <button
           type="button"
           onClick={() => setCursor(new Date(Date.UTC(year, month + 1, 1)))}
-          className="h-8 w-8 rounded-lg border border-edge text-slate-300 hover:bg-edge transition"
+          className="flex h-7 w-7 items-center justify-center rounded-lg border border-edge text-slate-400 transition-all hover:border-accent/40 hover:bg-edge hover:text-white"
           aria-label="Next month"
         >
           ›
         </button>
       </div>
 
-      <div className="grid grid-cols-7 gap-1 mb-1">
-        {WEEKDAYS.map((w) => (
-          <div key={w} className="text-center text-[11px] font-medium text-slate-500">
+      {/* Weekday headers */}
+      <div className="mb-1 grid grid-cols-7 gap-1">
+        {weekdays.map((w) => (
+          <div key={w} className="text-center text-[10px] font-semibold uppercase tracking-wide text-slate-600">
             {w}
           </div>
         ))}
       </div>
 
+      {/* Day cells */}
       <div className="grid grid-cols-7 gap-1">
         {cells.map((date, i) => {
           if (!date) return <div key={`b${i}`} />;
-          const past = date < iso(today);
+          const past = date < todayIso;
+          const isToday = date === todayIso;
           const isDepart = date === depart;
           const isReturn = date === ret;
           const ranged = inRange(date);
@@ -100,12 +113,17 @@ export default function Calendar({ depart, ret, onChange }: CalendarProps) {
               type="button"
               disabled={past}
               onClick={() => handlePick(date)}
+              aria-label={date}
+              aria-pressed={isDepart || isReturn}
               className={[
-                "h-9 rounded-lg text-sm transition relative",
-                past ? "text-slate-700 cursor-not-allowed" : "text-slate-200 hover:bg-edge",
-                ranged ? "bg-accent/15" : "",
+                "relative h-8 rounded-lg text-sm transition-all duration-150",
+                past ? "cursor-not-allowed text-slate-700" : "text-slate-200 hover:bg-edge",
+                ranged ? "bg-accent/15 text-slate-100" : "",
                 isDepart ? "bg-accent text-ink font-bold hover:bg-accent" : "",
                 isReturn ? "bg-accent2 text-ink font-bold hover:bg-accent2" : "",
+                isToday && !isDepart && !isReturn
+                  ? "ring-1 ring-accent/50 text-accent font-semibold"
+                  : "",
               ].join(" ")}
             >
               {parseInt(date.slice(8), 10)}
@@ -114,20 +132,27 @@ export default function Calendar({ depart, ret, onChange }: CalendarProps) {
         })}
       </div>
 
-      <div className="mt-3 flex gap-4 text-[11px] text-slate-400">
-        <span className="flex items-center gap-1">
-          <span className="h-3 w-3 rounded bg-accent inline-block" /> Depart
+      {/* Legend */}
+      <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1.5 text-[11px] text-slate-500">
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-2.5 w-2.5 rounded bg-accent" />
+          {t.calendarDepart}
         </span>
-        <span className="flex items-center gap-1">
-          <span className="h-3 w-3 rounded bg-accent2 inline-block" /> Return
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-2.5 w-2.5 rounded bg-accent2" />
+          {t.calendarReturn}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-2.5 w-2.5 rounded ring-1 ring-accent/50" />
+          {t.calendarToday}
         </span>
         {(depart || ret) && (
           <button
             type="button"
             onClick={() => onChange(undefined, undefined)}
-            className="ml-auto text-slate-500 hover:text-slate-200 underline"
+            className="ml-auto text-slate-600 underline transition hover:text-slate-300"
           >
-            Clear
+            {t.calendarClear}
           </button>
         )}
       </div>

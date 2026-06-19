@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import { useLang } from "@/components/LangProvider";
+import { translations } from "@/lib/i18n";
 import type { AirportOption } from "@/lib/airport-types";
 
 interface AsyncAirportSelectProps {
@@ -10,6 +12,8 @@ interface AsyncAirportSelectProps {
 }
 
 export default function AsyncAirportSelect({ label, value, onChange }: AsyncAirportSelectProps) {
+  const { lang } = useLang();
+  const t = translations[lang];
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const [highlight, setHighlight] = useState(0);
@@ -87,7 +91,7 @@ export default function AsyncAirportSelect({ label, value, onChange }: AsyncAirp
       <input
         className="input"
         value={display}
-        placeholder="City or IATA code"
+        placeholder={t.airportPlaceholder}
         autoComplete="off"
         role="combobox"
         aria-expanded={open}

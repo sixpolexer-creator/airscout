@@ -1,174 +1,185 @@
 "use client";
 
-import { useSearch, type StopsFilter } from "@/components/store";
-import { AIRLINE_LIST, ALLIANCES, type AirlineCode, type Alliance, type CarrierType } from "@/lib/airlines";
-import { CURRENCY_LIST, type CurrencyCode } from "@/lib/currency";
+import { useSearch } from "@/components/store";
+import { useLang } from "@/components/LangProvider";
+import { translations } from "@/lib/i18n";
+import { AIRLINE_LIST, type AirlineCode, type CarrierType } from "@/lib/airlines";
 
-const STOPS: { value: StopsFilter; label: string }[] = [
-  { value: "any", label: "Any" },
-  { value: "1stop", label: "≤1 stop" },
-  { value: "direct", label: "Direct" },
-];
-
-const CARRIER_TYPES: { value: CarrierType; label: string }[] = [
-  { value: "Legacy", label: "Full-service" },
-  { value: "LCC", label: "Low-cost" },
-];
-
-function toggle<T>(list: T[], value: T): T[] {
-  return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
-}
+const CARRIER_TYPES: CarrierType[] = ["Legacy", "LCC"];
+const TRIP_DAYS_MIN = 2;
+const TRIP_DAYS_MAX = 21;
 
 export default function FilterBar() {
-  const { currency, filters, set, setFilter } = useSearch();
+  const { filters, setFilter, set, tripDaysEnabled, tripDays, journeyType } = useSearch();
+  const { lang } = useLang();
+  const t = translations[lang];
+
+  const carrierLabels: Record<CarrierType, string> = {
+    Legacy: t.fullService,
+    LCC: t.lowCost,
+  };
+
+  const hasActiveFilters =
+    filters.carrierTypes.length > 0 || filters.airlines.length > 0 || filters.tripDays !== null;
+
+  function toggleCarrier(c: CarrierType) {
+    setFilter({
+      carrierTypes: filters.carrierTypes.includes(c)
+        ? filters.carrierTypes.filter((x) => x !== c)
+        : [...filters.carrierTypes, c],
+    });
+  }
+
+  function toggleAirline(code: AirlineCode) {
+    setFilter({
+      airlines: filters.airlines.includes(code)
+        ? filters.airlines.filter((x) => x !== code)
+        : [...filters.airlines, code],
+    });
+  }
+
+  function handleTripDaysToggle(enabled: boolean) {
+    set({ tripDaysEnabled: enabled });
+    setFilter({ tripDays: enabled ? tripDays : null });
+  }
+
+  function handleTripDaysChange(days: number) {
+    set({ tripDays: days });
+    setFilter({ tripDays: days });
+  }
+
+  function clearAll() {
+    setFilter({ stops: "any", outboundMaxStops: "any", returnMaxStops: "any", carrierTypes: [], airlines: [], tripDays: null });
+    set({ tripDaysEnabled: false });
+  }
 
   return (
-    <div className="space-y-4 rounded-2xl border border-edge bg-panel p-4 sm:p-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 className="text-sm font-bold text-slate-100">Filters</h3>
-        {/* Currency engine */}
-        <Segmented<CurrencyCode>
-          options={CURRENCY_LIST.map((c) => ({ value: c.code, label: `${c.symbol} ${c.code}` }))}
-          value={currency}
-          onChange={(c) => set({ currency: c })}
-        />
+    <div className="rounded-xl border border-edge/50 bg-panel/60 px-3 py-2.5">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+          {t.filters}
+        </span>
+        {hasActiveFilters && (
+          <button
+            type="button"
+            onClick={clearAll}
+            className="text-[10px] text-slate-500 transition-colors hover:text-rose-400"
+          >
+            {t.clearAllFilters}
+          </button>
+        )}
       </div>
 
-      <Row label="Stops">
-        <Segmented<StopsFilter>
-          options={STOPS}
-          value={filters.stops}
-          onChange={(v) => setFilter({ stops: v })}
-        />
-      </Row>
+      <div className="space-y-1.5">
+        {/* Carrier type */}
+        <FilterRow label={t.carrier}>
+          <PillGroup>
+            {CARRIER_TYPES.map((c) => (
+              <Pill key={c} active={filters.carrierTypes.includes(c)} onClick={() => toggleCarrier(c)}>
+                {carrierLabels[c]}
+              </Pill>
+            ))}
+          </PillGroup>
+        </FilterRow>
 
-      <Row label="Carrier">
-        <div className="flex flex-wrap gap-2">
-          {CARRIER_TYPES.map((c) => (
-            <Chip
-              key={c.value}
-              active={filters.carrierTypes.includes(c.value)}
-              onClick={() => setFilter({ carrierTypes: toggle(filters.carrierTypes, c.value) })}
-            >
-              {c.label}
-            </Chip>
-          ))}
-        </div>
-      </Row>
+        {/* Airlines */}
+        <FilterRow label={t.airlines}>
+          <div className="flex flex-wrap gap-1">
+            {AIRLINE_LIST.map((a) => (
+              <button
+                key={a.code}
+                type="button"
+                title={`${a.name} · ${a.carrierType === "LCC" ? t.lowCost : a.alliance}`}
+                onClick={() => toggleAirline(a.code)}
+                className={`rounded-md border px-1.5 py-0.5 text-[11px] font-semibold transition-all duration-150 ${
+                  filters.airlines.includes(a.code)
+                    ? "border-accent bg-accent/15 text-accent"
+                    : "border-edge bg-ink/40 text-slate-400 hover:border-slate-500 hover:text-slate-200"
+                }`}
+              >
+                <span className="font-bold">{a.code}</span>
+                <span className="ml-1 opacity-60">{a.name}</span>
+              </button>
+            ))}
+          </div>
+        </FilterRow>
 
-      <Row label="Alliance">
-        <div className="flex flex-wrap gap-2">
-          {ALLIANCES.map((a) => (
-            <Chip
-              key={a}
-              active={filters.alliances.includes(a)}
-              onClick={() => setFilter({ alliances: toggle(filters.alliances, a) })}
-            >
-              {a === "None" ? "Unallied" : a}
-            </Chip>
-          ))}
-        </div>
-      </Row>
+        {/* Trip Duration — only meaningful for round trips */}
+        {journeyType === "Roundtrip" && (
+          <FilterRow label="">
+            <div className="w-full space-y-2">
+              <label className="flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={tripDaysEnabled}
+                  onChange={(e) => handleTripDaysToggle(e.target.checked)}
+                  className="h-3.5 w-3.5 cursor-pointer rounded border-edge bg-ink/60 accent-accent"
+                />
+                <span className="text-[11px] font-medium text-slate-300">
+                  {t.tripDurationFilter}
+                </span>
+              </label>
 
-      <Row label="Airlines">
-        <div className="flex flex-wrap gap-2">
-          {AIRLINE_LIST.map((a) => (
-            <Chip
-              key={a.code}
-              active={filters.airlines.includes(a.code)}
-              onClick={() => setFilter({ airlines: toggle(filters.airlines, a.code) })}
-              title={`${a.name} · ${a.carrierType === "LCC" ? "Low-cost" : a.alliance}`}
-            >
-              <span className="font-bold">{a.code}</span>
-              <span className="ml-1 hidden text-[10px] opacity-70 sm:inline">{a.name}</span>
-            </Chip>
-          ))}
-        </div>
-      </Row>
-
-      {(filters.stops !== "any" ||
-        filters.outboundMaxStops !== "any" ||
-        filters.returnMaxStops !== "any" ||
-        filters.alliances.length > 0 ||
-        filters.carrierTypes.length > 0 ||
-        filters.airlines.length > 0) && (
-        <button
-          type="button"
-          onClick={() =>
-            setFilter({
-              stops: "any",
-              outboundMaxStops: "any",
-              returnMaxStops: "any",
-              alliances: [],
-              carrierTypes: [],
-              airlines: [],
-            })
-          }
-          className="text-xs text-slate-500 underline hover:text-slate-200"
-        >
-          Reset filters
-        </button>
-      )}
+              {tripDaysEnabled && (
+                <div className="space-y-1.5 pl-5">
+                  {/* Endpoint labels */}
+                  <div className="flex items-center justify-between text-[10px] text-slate-500">
+                    <span>{t.tripDurationDays(TRIP_DAYS_MIN)}</span>
+                    <span className="font-semibold text-accent">
+                      {t.tripDurationDays(tripDays)}
+                    </span>
+                    <span>{t.tripDurationDays(TRIP_DAYS_MAX)}</span>
+                  </div>
+                  {/* Slider — fill track up to current thumb position */}
+                  <input
+                    type="range"
+                    min={TRIP_DAYS_MIN}
+                    max={TRIP_DAYS_MAX}
+                    step={1}
+                    value={tripDays}
+                    onChange={(e) => handleTripDaysChange(Number(e.target.value))}
+                    className="trip-duration-slider w-full cursor-pointer"
+                    aria-label={t.tripDurationFilter}
+                    style={{
+                      background: `linear-gradient(to right, #38bdf8 ${((tripDays - TRIP_DAYS_MIN) / (TRIP_DAYS_MAX - TRIP_DAYS_MIN)) * 100}%, #1f2940 ${((tripDays - TRIP_DAYS_MIN) / (TRIP_DAYS_MAX - TRIP_DAYS_MIN)) * 100}%)`,
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          </FilterRow>
+        )}
+      </div>
     </div>
   );
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+function FilterRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:gap-3">
-      <span className="w-20 shrink-0 pt-1.5 text-xs font-medium text-slate-400">{label}</span>
+    <div className="flex items-start gap-3">
+      <span className="w-14 shrink-0 pt-1 text-[10px] font-medium uppercase tracking-wider text-slate-500">
+        {label}
+      </span>
       {children}
     </div>
   );
 }
 
-function Segmented<T extends string>({
-  options,
-  value,
-  onChange,
-}: {
-  options: { value: T; label: string }[];
-  value: T;
-  onChange: (v: T) => void;
-}) {
+function PillGroup({ children }: { children: React.ReactNode }) {
   return (
-    <div className="inline-flex rounded-lg border border-edge bg-ink/50 p-0.5">
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          onClick={() => onChange(o.value)}
-          className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
-            value === o.value ? "bg-accent text-ink" : "text-slate-300 hover:text-white"
-          }`}
-        >
-          {o.label}
-        </button>
-      ))}
+    <div className="inline-flex rounded-lg border border-edge bg-ink/40 p-0.5">
+      {children}
     </div>
   );
 }
 
-function Chip({
-  active,
-  onClick,
-  children,
-  title,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-  title?: string;
-}) {
+function Pill({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      title={title}
-      className={`rounded-full border px-2.5 py-1 text-xs transition ${
-        active
-          ? "border-accent bg-accent/15 text-accent"
-          : "border-edge bg-ink/40 text-slate-300 hover:border-slate-500"
+      className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition-all duration-150 ${
+        active ? "bg-accent text-ink shadow-sm" : "text-slate-400 hover:text-white"
       }`}
     >
       {children}

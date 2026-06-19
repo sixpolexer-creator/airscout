@@ -3,19 +3,88 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+  }
   html,
   body {
     @apply bg-ink text-slate-200;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Global slim scrollbars */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #1f2940 transparent;
+  }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #1f2940; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #38bdf8; }
+
+  /* Accessible keyboard focus ring */
+  :focus-visible {
+    @apply outline-none ring-2 ring-accent/40 ring-offset-2 ring-offset-ink rounded;
   }
 }
 
 @layer components {
   .input {
     @apply w-full rounded-lg border border-edge bg-ink/60 px-3 py-2 text-sm text-slate-100
-      outline-none transition placeholder:text-slate-600
-      focus:border-accent focus:ring-1 focus:ring-accent;
+      outline-none transition-all duration-200 placeholder:text-slate-600
+      hover:border-slate-600
+      focus:border-accent focus:ring-2 focus:ring-accent/20 focus:bg-panel/80;
   }
+}
+
+/* Trip-duration range slider — fill gradient is set inline via JS; only shape + thumb here */
+.trip-duration-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 9999px;
+  outline: none;
+}
+.trip-duration-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #38bdf8;
+  border: 2px solid #0c1628;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.5);
+  cursor: pointer;
+  transition: box-shadow 0.15s;
+}
+.trip-duration-slider::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.8);
+}
+.trip-duration-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #38bdf8;
+  border: 2px solid #0c1628;
+  cursor: pointer;
+}
+.trip-duration-slider::-moz-range-track {
+  height: 4px;
+  border-radius: 9999px;
+  background: #1f2940;
+}
+
+/* Logo micro-animation — scale + glow pulse, fires once per trigger */
+@keyframes logo-pulse {
+  0%   { transform: scale(1);    filter: brightness(1)    drop-shadow(0 0 0px  rgba(56,189,248,0));    }
+  35%  { transform: scale(1.07); filter: brightness(1.18) drop-shadow(0 0 14px rgba(56,189,248,0.65)); }
+  100% { transform: scale(1);    filter: brightness(1)    drop-shadow(0 0 0px  rgba(56,189,248,0));    }
+}
+
+.logo-pulse-anim {
+  animation: logo-pulse 0.55s cubic-bezier(0.22, 1, 0.36, 1) 1;
+  cursor: pointer;
 }
 
 /* Desktop-only: airport dropdown scrollbar polish */

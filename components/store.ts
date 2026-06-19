@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { CabinClass, FeedEvent, RankedOffer } from "@/lib/types";
-import type { Alliance, AirlineCode, CarrierType } from "@/lib/airlines";
+import type { AirlineCode, CarrierType } from "@/lib/airlines";
 import type { CurrencyCode } from "@/lib/currency";
 
 export type JourneyType = "Oneway" | "Roundtrip" | "Multi-City";
@@ -17,9 +17,9 @@ export interface ResultFilters {
   stops: StopsFilter;
   outboundMaxStops: number | "any"; // per-leg: "any" = no cap
   returnMaxStops: number | "any";
-  alliances: Alliance[];      // empty = all
   carrierTypes: CarrierType[]; // empty = all
   airlines: AirlineCode[];     // empty = all
+  tripDays: number | null;     // null = no constraint; N = only show trips of exactly N days
 }
 
 export interface SearchState {
@@ -34,6 +34,8 @@ export interface SearchState {
 
   journeyType: JourneyType;
   currency: CurrencyCode;
+  tripDaysEnabled: boolean;  // whether the trip-duration filter is active
+  tripDays: number;          // stay length in days (2–21), used when tripDaysEnabled
   legs: MultiLeg[];          // multi-city legs (>= 2 when journeyType is Multi-City)
   filters: ResultFilters;
 
@@ -68,11 +70,13 @@ export const useSearch = create<SearchState>((setState, getState) => ({
 
   journeyType: "Roundtrip",
   currency: "USD",
+  tripDaysEnabled: false,
+  tripDays: 7,
   legs: [
     { origin: "JFK", destination: "LHR", date: "" },
     { origin: "LHR", destination: "CDG", date: "" },
   ],
-  filters: { stops: "any", outboundMaxStops: "any", returnMaxStops: "any", alliances: [], carrierTypes: [], airlines: [] },
+  filters: { stops: "any", outboundMaxStops: "any", returnMaxStops: "any", carrierTypes: [], airlines: [], tripDays: null },
 
   searching: false,
   phase: "idle",
@@ -102,7 +106,7 @@ export const useSearch = create<SearchState>((setState, getState) => ({
     if (s.journeyType === "Multi-City") {
       const validLegs = s.legs.filter((l) => l.origin && l.destination && l.date);
       if (validLegs.length < 2) {
-        setState({ error: "Add at least two complete legs for a multi-city trip." });
+        setState({ error: "errorMinLegs" });
         return;
       }
       payloads = validLegs.map((l) => ({
@@ -116,7 +120,7 @@ export const useSearch = create<SearchState>((setState, getState) => ({
       }));
     } else {
       if (!s.departDate) {
-        setState({ error: "Pick a departure date first." });
+        setState({ error: "errorPickDate" });
         return;
       }
       payloads = [
@@ -129,6 +133,7 @@ export const useSearch = create<SearchState>((setState, getState) => ({
           cabin: s.cabin,
           flexDays: s.flexDays,
           includeNearby: s.includeNearby,
+          tripDays: s.tripDaysEnabled && s.journeyType === "Roundtrip" ? s.tripDays : undefined,
         },
       ];
     }
