@@ -39,7 +39,7 @@ export default function SearchForm() {
   const roundtrip = s.journeyType === "Roundtrip";
 
   return (
-    <div className="rounded-2xl border border-edge bg-panel p-4 shadow-xl">
+    <div className="rounded-2xl border border-edge bg-panel p-5 shadow-xl">
       {/* Journey type tabs */}
       <div className="mb-4 inline-flex rounded-lg border border-edge bg-ink/50 p-0.5">
         {journeys.map((j) => (
@@ -76,7 +76,7 @@ export default function SearchForm() {
                 type="button"
                 onClick={() => s.swap()}
                 title={t.swapTitle}
-                className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-edge bg-ink/40 text-slate-400 transition-all duration-200 hover:border-accent/50 hover:bg-edge hover:text-accent hover:rotate-180 active:scale-90"
+                className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-edge bg-ink/40 text-slate-400 transition-all duration-300 hover:border-accent/50 hover:bg-edge hover:text-accent hover:rotate-180 active:scale-95"
               >
                 ⇄
               </button>

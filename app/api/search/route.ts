@@ -1,10 +1,13 @@
 import type { NextRequest } from "next/server";
 import type { CabinClass, FeedEvent, FlightOffer, SearchQuery } from "@/lib/types";
 import { activeAdapters } from "@/lib/adapters";
+import { fanOutSearch } from "@/lib/adapters/orchestrator";
+import { withSearchCache } from "@/lib/adapters/cache-layer";
 import { expandFlexDates } from "@/lib/flex";
 import { dedupeOffers } from "@/lib/normalize";
 import { reasonedRank } from "@/lib/reasoning";
 import { nearbyAirports } from "@/lib/airports";
+import { isRegionId, expandRegion, regionById, type RegionId } from "@/lib/regions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,7 +22,8 @@ function parseQuery(body: unknown): SearchQuery | { error: string } {
   const departDate = String(b.departDate ?? "").trim();
 
   if (!/^[A-Z]{3}$/.test(origin)) return { error: "origin must be a 3-letter IATA code." };
-  if (!/^[A-Z]{3}$/.test(destination)) return { error: "destination must be a 3-letter IATA code." };
+  if (!/^[A-Z]{3}$/.test(destination) && !isRegionId(destination))
+    return { error: "destination must be a 3-letter IATA code or a region ID (e.g. REG_EUR)." };
   if (!/^\d{4}-\d{2}-\d{2}$/.test(departDate)) return { error: "departDate must be YYYY-MM-DD." };
   if (origin === destination) return { error: "origin and destination must differ." };
 
@@ -30,11 +34,14 @@ function parseQuery(body: unknown): SearchQuery | { error: string } {
   const flexDays = Math.min(7, Math.max(0, Math.floor(Number(b.flexDays) || 0)));
   const maxStops = b.maxStops != null ? Math.max(0, Math.floor(Number(b.maxStops))) : undefined;
   const includeNearby = Boolean(b.includeNearby);
-  const tripDays = b.tripDays != null
-    ? Math.min(21, Math.max(2, Math.floor(Number(b.tripDays))))
+  const tripDaysMin = b.tripDaysMin != null
+    ? Math.max(1, Math.floor(Number(b.tripDaysMin)))
+    : undefined;
+  const tripDaysMax = b.tripDaysMax != null
+    ? Math.min(30, Math.floor(Number(b.tripDaysMax)))
     : undefined;
 
-  return { origin, destination, departDate, returnDate, passengers, cabin, flexDays, maxStops, includeNearby, tripDays };
+  return { origin, destination, departDate, returnDate, passengers, cabin, flexDays, maxStops, includeNearby, tripDaysMin, tripDaysMax };
 }
 
 export async function POST(req: NextRequest) {
@@ -62,54 +69,33 @@ export async function POST(req: NextRequest) {
         const adapters = activeAdapters();
         const dateQueries = expandFlexDates(query);
 
-        // Destination set = requested airport + (optionally) nearby alternates.
-        const destinations: { code: string; km: number }[] = [{ code: query.destination, km: 0 }];
-        if (query.includeNearby) {
-          for (const n of nearbyAirports(query.destination, 130, true).slice(0, 3)) {
+        // Destination set: expand region ID → hub array, or use single IATA code.
+        const rawDest = query.destination;
+        const destinations: { code: string; km: number }[] = isRegionId(rawDest)
+          ? expandRegion(rawDest as RegionId).map((code) => ({ code, km: 0 }))
+          : [{ code: rawDest, km: 0 }];
+
+        // Nearby alternates only apply to single-airport destinations.
+        if (query.includeNearby && !isRegionId(rawDest)) {
+          for (const n of nearbyAirports(rawDest, 130, true).slice(0, 3)) {
             destinations.push({ code: n.airport.code, km: n.km });
           }
         }
 
+        const destLabel = isRegionId(rawDest)
+          ? regionById(rawDest as RegionId).label
+          : rawDest;
+
         send({
           type: "status",
           phase: "init",
-          detail: `Scanning ${adapters.map((a) => a.label).join(", ")} · ${dateQueries.length} date(s) × ${destinations.length} airport(s)${query.returnDate ? " · round trip" : ""}`,
+          detail: `Scanning ${adapters.map((a) => a.label).join(", ")} · ${dateQueries.length} date(s) × ${destinations.length} airport(s) → ${destLabel}${query.returnDate ? " · round trip" : ""}`,
           at: Date.now(),
         });
 
-        const collected: FlightOffer[] = [];
-        for (const dest of destinations) {
-          for (const dq of dateQueries) {
-            const scopedQuery = { ...dq, destination: dest.code };
-            for (const adapter of adapters) {
-              send({
-                type: "status",
-                phase: "fetch",
-                detail: `${adapter.label}: ${scopedQuery.origin}→${dest.code}${dest.km > 0 ? ` (≈${dest.km}km from ${query.destination})` : ""} on ${dq.departDate}`,
-                at: Date.now(),
-              });
-              try {
-                const offers = await adapter.search(scopedQuery);
-                for (const o of offers) o.nearbyKm = dest.km;
-                collected.push(...offers);
-                send({
-                  type: "status",
-                  phase: "fetched",
-                  detail: `${adapter.label} returned ${offers.length} offers for ${dest.code} on ${dq.departDate}`,
-                  at: Date.now(),
-                });
-              } catch (err) {
-                // Automated fallback: a failing source never aborts the search.
-                send({
-                  type: "status",
-                  phase: "fallback",
-                  detail: `${adapter.label} failed (${(err as Error).message}); continuing with remaining sources`,
-                  at: Date.now(),
-                });
-              }
-            }
-          }
-        }
+        const collected: FlightOffer[] = await withSearchCache(query, () =>
+          fanOutSearch({ adapters, dateQueries, destinations, baseQuery: query, onEvent: send }),
+        );
 
         const deduped = dedupeOffers(collected);
         send({
@@ -121,11 +107,21 @@ export async function POST(req: NextRequest) {
 
         const ranked = await reasonedRank(query, deduped);
 
-        // Stream a generous slice so client-side filters (stops, alliance,
-        // carrier, airline) always have a meaningful dataset to work over.
-        for (const offer of ranked.slice(0, 40)) {
+        // Build a stop-diverse stream: reserve capacity for direct flights so
+        // client-side stop filters always have data to work with, even when
+        // multi-stop results dominate by efficiency ranking.
+        const STREAM_CAP = 150;
+        const directs = ranked.filter((o) => o.stops === 0);
+        const indirects = ranked.filter((o) => o.stops > 0);
+        const directQuota = Math.min(directs.length, Math.ceil(STREAM_CAP * 0.4));
+        const toStream = [
+          ...directs.slice(0, directQuota),
+          ...indirects.slice(0, STREAM_CAP - directQuota),
+        ].sort((a, b) => a.rank - b.rank);
+
+        for (const offer of toStream) {
           send({ type: "deal", offer, at: Date.now() });
-          await new Promise((r) => setTimeout(r, 30));
+          await new Promise((r) => setTimeout(r, 20));
         }
 
         send({
