@@ -84,7 +84,6 @@
 
 .logo-pulse-anim {
   animation: logo-pulse 0.55s cubic-bezier(0.22, 1, 0.36, 1) 1;
-  cursor: pointer;
 }
 
 /* Desktop-only: airport dropdown scrollbar polish */

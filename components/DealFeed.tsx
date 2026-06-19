@@ -41,12 +41,12 @@ function passesFilters(o: RankedOffer, f: ResultFilters): boolean {
     ]);
     if (!f.airlines.some((a) => codes.has(a))) return false;
   }
-  // Trip-duration filter: only keep round trips whose stay length matches exactly.
-  if (f.tripDays !== null && o.roundTrip && o.inbound) {
+  // Trip-duration filter: keep round trips whose stay length falls within [tripDaysMin, tripDaysMax].
+  if (f.tripDaysMin !== null && f.tripDaysMax !== null && o.roundTrip && o.inbound) {
     const depMs = new Date(o.departDate).getTime();
     const retMs = new Date(o.inbound.departDate).getTime();
     const actualDays = Math.round((retMs - depMs) / 86400000);
-    if (actualDays !== f.tripDays) return false;
+    if (actualDays < f.tripDaysMin || actualDays > f.tripDaysMax) return false;
   }
   return true;
 }

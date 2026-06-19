@@ -29,6 +29,7 @@ export function useLang() {
 const LANGS: { code: Lang; flag: string; asset: string }[] = [
   { code: "en", flag: "🇺🇸", asset: "/USA-64.png" },
   { code: "he", flag: "🇮🇱", asset: "/israel-64.png" },
+  { code: "ru", flag: "🇷🇺", asset: "/russia-64.png" },
 ];
 
 export function LangToggle() {

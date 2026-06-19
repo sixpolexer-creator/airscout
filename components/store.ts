@@ -19,7 +19,8 @@ export interface ResultFilters {
   returnMaxStops: number | "any";
   carrierTypes: CarrierType[]; // empty = all
   airlines: AirlineCode[];     // empty = all
-  tripDays: number | null;     // null = no constraint; N = only show trips of exactly N days
+  tripDaysMin: number | null;  // null = no constraint; range lower bound
+  tripDaysMax: number | null;  // range upper bound
 }
 
 export interface SearchState {
@@ -36,6 +37,7 @@ export interface SearchState {
   currency: CurrencyCode;
   tripDaysEnabled: boolean;  // whether the trip-duration filter is active
   tripDays: number;          // stay length in days (2–21), used when tripDaysEnabled
+  tripDurationFlex: number;  // ±N days window for Trip Duration filter (0–7); separate from calendar flexDays
   legs: MultiLeg[];          // multi-city legs (>= 2 when journeyType is Multi-City)
   filters: ResultFilters;
 
@@ -72,11 +74,12 @@ export const useSearch = create<SearchState>((setState, getState) => ({
   currency: "USD",
   tripDaysEnabled: false,
   tripDays: 7,
+  tripDurationFlex: 2,
   legs: [
     { origin: "JFK", destination: "LHR", date: "" },
     { origin: "LHR", destination: "CDG", date: "" },
   ],
-  filters: { stops: "any", outboundMaxStops: "any", returnMaxStops: "any", carrierTypes: [], airlines: [], tripDays: null },
+  filters: { stops: "any", outboundMaxStops: "any", returnMaxStops: "any", carrierTypes: [], airlines: [], tripDaysMin: null, tripDaysMax: null },
 
   searching: false,
   phase: "idle",
@@ -133,7 +136,8 @@ export const useSearch = create<SearchState>((setState, getState) => ({
           cabin: s.cabin,
           flexDays: s.flexDays,
           includeNearby: s.includeNearby,
-          tripDays: s.tripDaysEnabled && s.journeyType === "Roundtrip" ? s.tripDays : undefined,
+          tripDaysMin: s.tripDaysEnabled && s.journeyType === "Roundtrip" ? Math.max(1, s.tripDays - s.tripDurationFlex) : undefined,
+          tripDaysMax: s.tripDaysEnabled && s.journeyType === "Roundtrip" ? s.tripDays + s.tripDurationFlex : undefined,
         },
       ];
     }

@@ -117,7 +117,13 @@ Order the array best-first.`;
     for (const leftover of byId.values()) {
       ordered.push({ ...leftover, rank: ordered.length + 1 });
     }
-    return ordered.length ? ordered : baseline;
+    // Merge LLM-reordered top slice with heuristic-ranked tail so the full
+    // offer pool reaches the route handler for client-side filtering.
+    const combined = [...ordered, ...baseline.slice(shortlist.length)].map((o, i) => ({
+      ...o,
+      rank: i + 1,
+    }));
+    return combined.length > 0 ? combined : baseline;
   } catch {
     // Any LLM/parse failure degrades gracefully to the deterministic ranking.
     return baseline;

@@ -12,7 +12,8 @@ export interface SearchQuery {
   passengers: number;    // adults
   cabin: CabinClass;
   flexDays: number;      // +/- N day window expansion (0 = exact dates)
-  tripDays?: number;     // fixed stay length: scan full window but only return pairs where returnDate = departDate + tripDays
+  tripDaysMin?: number;  // flexible stay lower bound (inclusive); derived from D−F
+  tripDaysMax?: number;  // flexible stay upper bound (inclusive); derived from D+F
   maxStops?: number;     // optional ceiling on connections
   includeNearby?: boolean; // also scan alternate airports near the destination
 }

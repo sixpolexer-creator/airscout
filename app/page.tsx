@@ -28,7 +28,7 @@ export default function Home() {
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-center gap-3">
               <LogoImage
-                src="/logo1.png"
+                src="/logo3.png"
                 alt="AirScout"
                 className="h-20 w-auto object-contain xl:h-24 2xl:h-28 drop-shadow-[0_0_12px_rgba(56,189,248,0.25)]"
               />
@@ -57,27 +57,28 @@ export default function Home() {
 function HeaderControls() {
   const s = useSearch();
   return (
-    <div className="mt-1 flex shrink-0 flex-col items-end gap-1.5" dir="ltr">
+    <div className="mt-1 flex w-[118px] shrink-0 flex-col items-stretch gap-1.5" dir="ltr">
       <LangToggle />
-      <div className="inline-flex rounded-lg border border-edge bg-ink/50 p-0.5">
+      <div className="flex w-full rounded-lg border border-edge bg-ink/50 p-0.5">
         {CURRENCY_LIST.map((c) => (
           <button
             key={c.code}
             type="button"
             onClick={() => s.set({ currency: c.code })}
-            className={`rounded-md px-2 py-1 text-[11px] font-semibold transition-all duration-150 ${
+            className={`flex h-9 flex-1 flex-col items-center justify-center gap-px rounded-md transition-all duration-150 ${
               s.currency === c.code
                 ? "bg-accent text-ink shadow-sm"
                 : "text-slate-400 hover:text-white"
             }`}
           >
-            {c.symbol} {c.code}
+            <span className="text-sm font-bold leading-none">{c.symbol}</span>
+            <span className="text-[9px] font-semibold leading-none tracking-wide">{c.code}</span>
           </button>
         ))}
       </div>
       <Link
         href="/intel"
-        className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-edge/70 bg-panel/40 px-3 py-1 text-[11px] font-semibold text-slate-400 transition-all hover:border-accent2/40 hover:bg-accent2/5 hover:text-accent2"
+        className="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-edge/70 bg-panel/40 px-3 text-[11px] font-semibold text-slate-400 transition-all hover:border-accent2/40 hover:bg-accent2/5 hover:text-accent2"
       >
         <span className="text-accent2">◎</span> Intel Hub
       </Link>
